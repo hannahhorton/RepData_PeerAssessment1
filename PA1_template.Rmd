@@ -8,18 +8,110 @@ output:
 
 ## Loading and preprocessing the data
 
+```{r}
+library(ggplot2)
+library(dplyr)
+library(data.table)
+unzip('activity.zip')
+data = read.csv('activity.csv', header = TRUE)
+data$date = as.Date(data$date)
 
+```
 
 ## What is mean total number of steps taken per day?
 
+```{r}
+totalsteps = tapply(data$steps, data$date, sum)
+qplot(totalsteps, geom = 'histogram', xlab = 'number of steps', main = 'Steps Per Day', bins = 10)
+mean = mean(totalsteps, na.rm = TRUE)
+median = median(totalsteps, na.rm = TRUE)
 
+```
+
+This is the mean number of steps:
+
+```{r}
+mean
+```
+
+This is the median number of steps:
+
+```{r}
+median
+```
 
 ## What is the average daily activity pattern?
 
+```{r}
+intervals = tapply(data$steps, data$interval, mean, na.rm = TRUE)
+plot(as.numeric(names(intervals)),
+     intervals, xlab = 'Interval', ylab = 'number of steps', main = 'Average Daily Activity Pattern')
+maxinterval = names(sort(intervals, decreasing = TRUE))
+maxnumber = sort(intervals, decreasing = TRUE)[1]
+```
+This is the 5-minute interval with the most # steps and the maximum value:
 
+```{r}
+maxnumber
+```
 
 ## Imputing missing values
 
+```{r}
+missingvals = is.na(data$steps)
+totalmissing = sum(missingvals)
+```
 
+This is the total number of missing values:
+```{r}
+totalmissing
+```
+
+My strategy is to fill in missing data with the average of the available data points for each interval
+
+```{r}
+datasplit = split(data, data$interval)
+for(i in 1:length(datasplit)){
+  datasplit[[i]]$steps[is.na(datasplit[[i]]$steps)] = intervals[i]
+  
+}
+
+datainput = do.call('rbind', datasplit)
+datainput = datainput[order(datainput$date) ,]
+
+totalstepsinput = tapply(datainput$steps, datainput$date, sum)
+qplot(totalstepsinput, geom = 'histogram', xlab = 'number of steps', main = 'Steps Per Day (Missing Data Filled In)', bins = 10)
+
+mean = mean(totalstepsinput, na.rm = TRUE)
+median = median(totalstepsinput, na.rm = TRUE)
+
+```
+
+This is the mean number of steps with the missing values filled in:
+```{r}
+mean
+```
+
+This is the median number of steps with the missing values filled in:
+```{r}
+median
+```
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+days = mutate(data, day = ifelse(weekdays(data$date) == 'Saturday' | weekdays(data$date) == 'Sunday', 'weekend', 'weekday'))
+days$day = as.factor(days$day)
+
+wknd = subset(days,as.character(days$day)=='weekend')
+wkdy = subset(days,as.character(days$day)=='weekday')
+wkndsteps = with(wknd,tapply(steps,interval,mean,na.rm=TRUE))
+wkdysteps = with(wkdy,tapply(steps,interval,mean,na.rm=TRUE))
+intwknd = unique(wknd$interval)
+intwkdy = unique(wkdy$interval)
+newwknd = data.frame(cbind(wkndsteps,intwknd))
+newwkdy = data.frame(cbind(wkdysteps,intwkdy))
+par(mfrow=c(2,1),mar=c(4,4,2,1))
+plot(newwknd$intwknd,newwknd$wkndsteps,xlab = 'intervals', ylab = 'steps mean', main = 'weekend')
+plot(newwkdy$intwkdy,newwkdy$wkdysteps,xlab = 'intervals', ylab = 'steps mean', main = 'weekday')
+```
